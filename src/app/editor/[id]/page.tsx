@@ -75,9 +75,9 @@ export default function EditorPage() {
           }, 150);
         }
       })
-      .catch((err) => {
+      .catch((err: any) => {
         console.error('Error fetching workflow:', err);
-        toast.error('Failed to load workflow definition from backend.');
+        toast.error(`Failed to load workflow definition: ${err?.message || err}`);
       });
 
     return () => {

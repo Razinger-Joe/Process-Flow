@@ -73,9 +73,9 @@ export default function DashboardPage() {
           setIsLoading(false);
         }
       })
-      .catch((error) => {
+      .catch((error: any) => {
         console.error('Error listing workflows:', error);
-        toast.error('Failed to load workflows. Please check your backend connection.');
+        toast.error(`Failed to load workflows: ${error?.message || error || 'Please check your backend connection.'}`);
         if (mounted) {
           setIsLoading(false);
         }
@@ -96,9 +96,9 @@ export default function DashboardPage() {
       });
       toast.success('Workflow created successfully!', 'Success');
       router.push(`/editor/${newWf.id}`);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating workflow:', error);
-      toast.error('Failed to create new workflow. Please try again.');
+      toast.error(`Failed to create new workflow: ${error?.message || error || 'Please try again.'}`);
     } finally {
       setIsCreating(false);
     }
