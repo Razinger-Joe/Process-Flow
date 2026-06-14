@@ -7,7 +7,7 @@ Defines endpoints for triggering workflow runs and inspecting execution history/
 from typing import Annotated
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,8 +18,8 @@ from app.models.run import RunRecord
 from app.schemas.run import RunRecordOut
 from app.services.auth_service import get_current_user
 
-# We will import the celery task in Step 10, for now we will stub trigger logic
-# from app.tasks import run_workflow_task
+# Import the celery task for async execution
+from app.tasks import run_workflow_task
 
 router = APIRouter()
 
@@ -32,12 +32,13 @@ router = APIRouter()
 )
 async def trigger_run(
     workflow_id: uuid.UUID,
+    background_tasks: BackgroundTasks,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """
     Creates a new RunRecord in the database and triggers the background Celery task
-    for node-by-node execution.
+    for node-by-node execution. Falls back to FastAPI BackgroundTasks if Redis is offline.
     """
     # Verify workflow exists and belongs to current user
     result = await db.execute(
@@ -64,11 +65,13 @@ async def trigger_run(
     db.add(new_run)
     await db.flush()
 
-    # Trigger Celery execution asynchronously (will be wired in Step 10)
-    # run_workflow_task.delay(str(new_run.id))
-    
-    # Temporarily print a mock notice until Celery is wired
-    print(f"DEBUG: Triggered workflow run {new_run.id} for workflow {workflow.name}")
+    # Trigger Celery execution asynchronously, fallback to BackgroundTasks if offline
+    try:
+        run_workflow_task.delay(str(new_run.id))
+        print(f"INFO: Successfully dispatched run {new_run.id} to Celery worker.")
+    except Exception as exc:
+        print(f"WARNING: Redis/Celery offline ({exc}). Executing via FastAPI BackgroundTasks.")
+        background_tasks.add_task(run_workflow_task, str(new_run.id))
 
     return new_run
 
