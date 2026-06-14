@@ -36,8 +36,10 @@ RUN groupadd --gid 1000 appuser && \
 
 WORKDIR /home/appuser/backend
 
-# Copy application code
+# Copy application code and migrations
 COPY --chown=appuser:appuser app/ ./app/
+COPY --chown=appuser:appuser alembic/ ./alembic/
+COPY --chown=appuser:appuser alembic.ini .
 
 USER appuser
 
