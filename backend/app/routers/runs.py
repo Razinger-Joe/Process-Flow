@@ -139,3 +139,59 @@ async def get_run_detail(
             detail="Run record not found or you do not have access.",
         )
     return run_record
+
+
+@router.get(
+    "/detail/{run_id}/stream",
+    summary="Stream execution logs in real-time using SSE",
+)
+async def stream_run_logs(
+    run_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Real-time Server-Sent Events (SSE) log stream for a specific run.
+    Yields log records as they are appended to the database.
+    """
+    from sse_starlette.sse import EventSourceResponse
+    import json
+    import asyncio
+
+    async def log_generator():
+        last_log_count = 0
+        while True:
+            # Query the database for the run record
+            result = await db.execute(select(RunRecord).where(RunRecord.id == run_id))
+            run_record = result.scalar_one_or_none()
+            
+            if not run_record:
+                yield {
+                    "event": "error",
+                    "data": json.dumps({"message": "Run record not found"}),
+                }
+                break
+
+            # Refresh the record to get the latest updates from database (clears SQLAlchemy session cache)
+            await db.refresh(run_record)
+
+            logs = run_record.logs or []
+            if len(logs) > last_log_count:
+                new_logs = logs[last_log_count:]
+                for log in new_logs:
+                    yield {
+                        "event": "log",
+                        "data": json.dumps(log),
+                    }
+                last_log_count = len(logs)
+
+            # Check if execution finished
+            if run_record.status in ["success", "error"]:
+                yield {
+                    "event": "complete",
+                    "data": json.dumps({"status": run_record.status}),
+                }
+                break
+
+            await asyncio.sleep(0.3)
+
+    return EventSourceResponse(log_generator())
