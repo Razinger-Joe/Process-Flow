@@ -49,6 +49,12 @@ export default function DashboardPage() {
     let mounted = true;
     setIsLoading(true);
 
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+      toast.error('Supabase environment variables are missing! Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Vercel.', 'Config Error');
+      setIsLoading(false);
+      return;
+    }
+
     listWorkflows()
       .then((data) => {
         if (mounted) {
