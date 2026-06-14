@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     """Application settings loaded from .env file."""
 
     # ---- Database ----
-    DATABASE_URL: str = "postgresql+asyncpg://user:password@localhost:5432/processflow"
+    DATABASE_URL: str = "sqlite+aiosqlite:///./processflow.db"
 
     # ---- Redis ----
     REDIS_URL: str = "redis://localhost:6379/0"

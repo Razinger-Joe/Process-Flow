@@ -8,8 +8,7 @@ log lines (as JSONB), and final output data.
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, ForeignKey, String
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy import DateTime, ForeignKey, String, Uuid, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -21,18 +20,18 @@ class RunRecord(Base):
     __tablename__ = "run_records"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid,
         primary_key=True,
         default=uuid.uuid4,
     )
     workflow_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid,
         ForeignKey("workflows.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
     user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid,
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
@@ -53,13 +52,13 @@ class RunRecord(Base):
         nullable=True,
     )
     logs: Mapped[list] = mapped_column(
-        JSONB,
+        JSON,
         nullable=False,
         default=list,
         doc="Array of LogLine objects: [{id, timestamp, nodeId, ...}]",
     )
     result: Mapped[dict | None] = mapped_column(
-        JSONB,
+        JSON,
         nullable=True,
         doc="Final output data from the last node",
     )

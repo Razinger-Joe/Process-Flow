@@ -9,25 +9,24 @@ so the frontend canvas can be reconstructed from the DB.
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, Uuid, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
 
 
 class Workflow(Base):
-    """Workflow — stores the visual graph definition as JSONB."""
+    """Workflow — stores the visual graph definition as JSON."""
 
     __tablename__ = "workflows"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid,
         primary_key=True,
         default=uuid.uuid4,
     )
     user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid,
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
@@ -41,7 +40,7 @@ class Workflow(Base):
         nullable=True,
     )
     definition: Mapped[dict] = mapped_column(
-        JSONB,
+        JSON,
         nullable=False,
         default=dict,
         doc="Stores { nodes: [...], edges: [...] } as JSON",
