@@ -99,14 +99,15 @@ async def list_workflows(
                     "id": "f3",
                     "type": "logic",
                     "label": "Data transform — extract suspicious",
-                    "description": "Flags transactions over KES 500,000 or from outside Kenya",
+                    "description": "Flags transactions from outside Kenya",
                     "position": {"x": 600, "y": 200},
                     "config": {
                         "operation": "filter_list",
-                        "field": "transactions",
-                        "condition": "amount > 500000 OR country != 'KE'",
-                        "output_field": "suspicious_transactions",
-                        "description": "Flags transactions over KES 500,000 or from outside Kenya"
+                        "source": "{{data.f2.body.transactions}}",
+                        "key": "country",
+                        "operator": "neq",
+                        "value": "KE",
+                        "description": "Flags transactions from outside Kenya"
                     }
                 },
                 {
@@ -116,7 +117,7 @@ async def list_workflows(
                     "description": "Branches based on whether fraud was detected",
                     "position": {"x": 850, "y": 200},
                     "config": {
-                        "field": "suspicious_transactions.length",
+                        "field": "{{data.f3.list.length}}",
                         "operator": "gt",
                         "value": "0",
                         "description": "Branches based on whether fraud was detected"
@@ -130,8 +131,8 @@ async def list_workflows(
                     "position": {"x": 1100, "y": 50},
                     "config": {
                         "to": "compliance@company.co.ke",
-                        "subject": "🚨 ALERT: {{data.suspicious_transactions.length}} suspicious transactions detected",
-                        "body_template": "Dear Compliance Team,\n\nOur automated system has flagged {{data.suspicious_transactions.length}} suspicious transactions this week.\n\nPlease review immediately.\n\nProcessFlow Studio — Automated Alert",
+                        "subject": "🚨 ALERT: Suspicious transactions detected outside Kenya",
+                        "body_template": "Dear Compliance Team,\n\nOur automated system has flagged {{data.f3.list.length}} suspicious international transactions this week.\n\nPlease review immediately: {{data.f3.list}}\n\nProcessFlow Studio — Automated Alert",
                         "description": "Sends fraud alert only if suspicious transactions exist"
                     }
                 },
@@ -139,15 +140,13 @@ async def list_workflows(
                     "id": "f6",
                     "type": "logic",
                     "label": "Data transform — compute report",
-                    "description": "Computes weekly summary statistics",
+                    "description": "Extracts transactions list for summary stats",
                     "position": {"x": 1100, "y": 350},
                     "config": {
-                        "operations": [
-                            "total_volume = sum(transactions.amount)",
-                            "avg_transaction = mean(transactions.amount)",
-                            "top_5 = sort(transactions, amount, desc).slice(0,5)"
-                        ],
-                        "description": "Computes weekly summary statistics"
+                        "operation": "extract_field",
+                        "source": "{{data.f2.body}}",
+                        "field_name": "transactions",
+                        "description": "Extracts transactions list for summary stats"
                     }
                 },
                 {
@@ -158,8 +157,8 @@ async def list_workflows(
                     "position": {"x": 1350, "y": 200},
                     "config": {
                         "to": "cfo@company.co.ke, management@company.co.ke",
-                        "subject": "📊 Weekly Transaction Report — {{data.week_label}}",
-                        "body_template": "Weekly Financial Summary\n\nTotal Volume: KES {{data.total_volume | format_currency}}\nTotal Transactions: {{data.transactions.length}}\nAverage Transaction: KES {{data.avg_transaction | format_currency}}\nSuspicious Flagged: {{data.suspicious_transactions.length}}\n\n— ProcessFlow Studio",
+                        "subject": "📊 Weekly Transaction Report",
+                        "body_template": "Weekly Financial Summary\n\nTotal Transactions: {{data.f6.value.length}}\nSuspicious Flagged: {{data.f3.list.length}}\n\n— ProcessFlow Studio",
                         "description": "Weekly report to management regardless of fraud status"
                     }
                 },
@@ -170,7 +169,7 @@ async def list_workflows(
                     "description": "Final audit log entry",
                     "position": {"x": 1600, "y": 200},
                     "config": {
-                        "message_template": "Weekly run complete. {{data.transactions.length}} transactions processed. {{data.suspicious_transactions.length}} flagged. Report sent to CFO.",
+                        "message": "Weekly financial audit execution completed successfully. {{data.f6.value.length}} transactions processed. {{data.f3.list.length}} flagged.",
                         "description": "Final audit log entry"
                     }
                 }
@@ -200,6 +199,11 @@ async def list_workflows(
                         "endpoint": "/webhooks/auth-events",
                         "method": "POST",
                         "expected_payload": "{\"event\": \"login_failed\", \"ip\": \"string\", \"user\": \"string\", \"timestamp\": \"ISO8601\"}",
+                        "mock_payload": {
+                            "ip": "197.254.88.41",
+                            "user": "admin@company.co.ke",
+                            "event": "login_failed"
+                        },
                         "description": "Receives every failed login event from the auth system in real time"
                     }
                 },
@@ -210,7 +214,7 @@ async def list_workflows(
                     "description": "Checks how many times this IP has failed in the last 10 minutes",
                     "position": {"x": 350, "y": 200},
                     "config": {
-                        "url": "https://security.internal/api/failed-logins?ip={{data.ip}}&window=10m",
+                        "url": "https://security.internal/api/failed-logins?ip={{data.c1.ip}}&window=10m",
                         "method": "GET",
                         "description": "Checks how many times this IP has failed in the last 10 minutes"
                     }
@@ -222,7 +226,7 @@ async def list_workflows(
                     "description": "Triggers response only if 5 or more failures detected",
                     "position": {"x": 600, "y": 200},
                     "config": {
-                        "field": "failed_count",
+                        "field": "{{data.c2.body.failed_count}}",
                         "operator": "gte",
                         "value": "5",
                         "description": "Triggers response only if 5 or more failures detected"
@@ -237,7 +241,7 @@ async def list_workflows(
                     "config": {
                         "url": "https://firewall.internal/api/blocklist",
                         "method": "POST",
-                        "body": "{\"ip\": \"{{data.ip}}\", \"reason\": \"Brute force detected\", \"duration_hours\": 24}",
+                        "body": "{\"ip\": \"{{data.c1.ip}}\", \"reason\": \"Brute force detected\", \"duration_hours\": 24}",
                         "description": "Adds the offending IP to the firewall blocklist for 24 hours"
                     }
                 },
@@ -250,7 +254,7 @@ async def list_workflows(
                     "config": {
                         "url": "https://jira.internal/api/issues",
                         "method": "POST",
-                        "body": "{\"project\": \"SEC\", \"type\": \"Security Incident\", \"priority\": \"High\", \"title\": \"Brute force attempt from {{data.ip}}\", \"description\": \"{{data.failed_count}} failed logins in 10 minutes targeting user {{data.user}}\"}",
+                        "body": "{\"project\": \"SEC\", \"type\": \"Security Incident\", \"priority\": \"High\", \"title\": \"Brute force attempt from {{data.c1.ip}}\", \"description\": \"{{data.c2.body.failed_count}} failed logins in 10 minutes targeting user {{data.c1.user}}\"}",
                         "description": "Creates a tracked security incident in the ticketing system"
                     }
                 },
@@ -258,16 +262,13 @@ async def list_workflows(
                     "id": "c6",
                     "type": "logic",
                     "label": "Data transform — enrich IP data",
-                    "description": "Enriches raw IP data with geolocation and risk scoring",
+                    "description": "Extracts the IP field from request",
                     "position": {"x": 1350, "y": 50},
                     "config": {
-                        "operations": [
-                            "geo = geolocate(data.ip)",
-                            "isp = lookup_isp(data.ip)",
-                            "risk_score = calculate_risk(data.failed_count, geo.country)",
-                            "summary = format('IP {{ip}} from {{geo.city}}, {{geo.country}} ({{isp}}) — Risk: {{risk_score}}/100')"
-                        ],
-                        "description": "Enriches raw IP data with geolocation and risk scoring"
+                        "operation": "extract_field",
+                        "source": "{{data.c1}}",
+                        "field_name": "ip",
+                        "description": "Extracts the IP field from request"
                     }
                 },
                 {
@@ -278,8 +279,8 @@ async def list_workflows(
                     "position": {"x": 1600, "y": 50},
                     "config": {
                         "to": "soc-team@company.co.ke",
-                        "subject": "🔴 SECURITY INCIDENT: Brute force from {{data.ip}}",
-                        "body_template": "SECURITY ALERT — IMMEDIATE ACTION REQUIRED\n\nIncident Type : Brute Force Attack\nOffending IP  : {{data.ip}}\nFailed Logins : {{data.failed_count}} in 10 minutes\nTarget User   : {{data.user}}\nAction Taken  : IP blocked for 24 hours\n\n— ProcessFlow Studio Security Automation",
+                        "subject": "🔴 SECURITY ALERT: Brute force from {{data.c1.ip}}",
+                        "body_template": "SECURITY ALERT — IMMEDIATE ACTION REQUIRED\n\nIncident Type : Brute Force Attack\nOffending IP  : {{data.c1.ip}}\nFailed Logins : {{data.c2.body.failed_count}} in 10 minutes\nTarget User   : {{data.c1.user}}\nAction Taken  : IP blocked for 24 hours\n\n— ProcessFlow Studio Security Automation",
                         "description": "Detailed alert to the security operations center"
                     }
                 },
@@ -290,9 +291,9 @@ async def list_workflows(
                     "description": "Instant Slack ping to SOC channel for fastest response",
                     "position": {"x": 1850, "y": 50},
                     "config": {
-                        "url": "https://hooks.slack.com/services/{{env.SLACK_WEBHOOK}}",
+                        "url": "https://hooks.slack.com/services/mock-webhook",
                         "method": "POST",
-                        "body": "{\"text\": \":red_circle: *Brute force blocked* — IP `{{data.ip}}` made {{data.failed_count}} failed attempts on `{{data.user}}`. Blocked 24h.\"}",
+                        "body": "{\"text\": \":red_circle: *Brute force blocked* — IP `{{data.c1.ip}}` made {{data.c2.body.failed_count}} failed attempts on `{{data.c1.user}}`. Blocked 24h.\"}",
                         "description": "Instant Slack ping to SOC channel for fastest response"
                     }
                 },
@@ -303,7 +304,7 @@ async def list_workflows(
                     "description": "Audit trail entry for compliance and forensics",
                     "position": {"x": 2100, "y": 200},
                     "config": {
-                        "message_template": "Incident response complete. IP {{data.ip}} blocked. Ticket SEC-2847 created. SOC notified via email + Slack.",
+                        "message": "Incident response complete. IP {{data.c1.ip}} blocked. Ticket SEC-2847 created. SOC notified via email + Slack.",
                         "description": "Audit trail entry for compliance and forensics"
                     }
                 }

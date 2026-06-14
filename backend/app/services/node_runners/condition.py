@@ -39,6 +39,10 @@ async def run(node_id: str, config: dict, context: ExecutionContext) -> dict[str
             result = float(left_val) > float(right_val)
         elif operator == "lt":
             result = float(left_val) < float(right_val)
+        elif operator == "gte":
+            result = float(left_val) >= float(right_val)
+        elif operator == "lte":
+            result = float(left_val) <= float(right_val)
         elif operator == "contains":
             if left_val is None:
                 result = False

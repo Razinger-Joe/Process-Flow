@@ -28,7 +28,7 @@ from app.services.node_runners import (
 # Mock runner for triggers that don't need external operations during execution
 async def run_trigger_node(node_id: str, config: dict, context: ExecutionContext) -> dict[str, Any]:
     context.add_log("Trigger activated successfully", node_id, "success")
-    return {"triggered": True}
+    return config.get("mock_payload") or {"triggered": True}
 
 # Node type/label mapping to runners
 RUNNERS = {
@@ -169,7 +169,10 @@ class WorkflowEngine:
 
                 try:
                     # Run node logic
-                    output = await runner_module.run(curr_id, config, context)
+                    if hasattr(runner_module, "run"):
+                        output = await runner_module.run(curr_id, config, context)
+                    else:
+                        output = await runner_module(curr_id, config, context)
                     context.data[curr_id] = output
                     last_output = output
                 except Exception as node_err:

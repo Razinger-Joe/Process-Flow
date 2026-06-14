@@ -8,6 +8,7 @@ used by all individual node type runners.
 from datetime import datetime, timezone
 import re
 import uuid
+from typing import Any
 
 
 class ExecutionContext:
@@ -30,25 +31,41 @@ class ExecutionContext:
         })
 
 
-def interpolate_value(val: str, context_data: dict) -> str:
+def interpolate_value(val: str, context_data: dict) -> Any:
     """
     Interpolates {{data.node_id.field}} style templates within strings.
-    Example: "{{data.node_1.body.name}}" -> "Alice"
+    If the string is exactly a template (e.g. "{{path}}"), returns the raw object.
     """
     if not isinstance(val, str):
         return val
 
-    def replacer(match):
-        path = match.group(1).strip()
+    # Check if the string is exactly a single template like "{{some.path}}"
+    exact_match = re.match(r'^\{\{\s*(.*?)\s*\}\}$', val)
+    if exact_match:
+        path = exact_match.group(1).strip()
         parts = path.split('.')
-        
-        # Traverse the context_data dict
         current = context_data
         for part in parts:
             if isinstance(current, dict) and part in current:
                 current = current[part]
+            elif (isinstance(current, list) or isinstance(current, dict)) and part == "length":
+                current = len(current)
             else:
-                return match.group(0)  # Return original if path not found
+                return val  # Return original string if path not found
+        return current
+
+    # Otherwise do standard substring regex replacement
+    def replacer(match):
+        path = match.group(1).strip()
+        parts = path.split('.')
+        current = context_data
+        for part in parts:
+            if isinstance(current, dict) and part in current:
+                current = current[part]
+            elif (isinstance(current, list) or isinstance(current, dict)) and part == "length":
+                current = len(current)
+            else:
+                return match.group(0)
         return str(current)
 
     return re.sub(r'\{\{(.*?)\}\}', replacer, val)
