@@ -233,9 +233,9 @@ export function Navbar({ workflowName, isEditor = false, onRun, onSave, onRename
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>My Account</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={logout} className="text-rose-500 focus:text-rose-500 cursor-pointer">
+            <DropdownMenuItem disabled className="text-muted-foreground">
               <LogOut className="mr-2 size-4" />
-              <span>Log out</span>
+              <span>Auth (Disabled)</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

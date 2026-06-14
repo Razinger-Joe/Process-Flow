@@ -64,9 +64,13 @@ async function runTest() {
 
   // 4. Verify results
   const { data: finalRecord } = await supabase.from('run_records').select('status, logs').eq('id', runRecord.id).single();
+  if (!finalRecord) {
+    console.error('Final record not found');
+    return;
+  }
   console.log('Final Status:', finalRecord.status);
   console.log('Final Logs:');
-  finalRecord.logs.forEach((log: any) => {
+  (finalRecord.logs as any)?.forEach((log: any) => {
     console.log(`[${log.level.toUpperCase()}] ${log.message}`);
   });
 }
