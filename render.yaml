@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: processflow-backend
+    env: python
+    buildCommand: "cd backend && pip install -r requirements.txt"
+    startCommand: "cd backend && alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ENVIRONMENT
+        value: production
+      - key: APP_VERSION
+        value: 1.0.0
+      - key: FRONTEND_URL
+        value: https://process-flow.vercel.app # Update this with your Vercel URL
