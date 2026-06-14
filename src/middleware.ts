@@ -11,17 +11,18 @@ export function middleware(request: NextRequest) {
   const token = request.cookies.get('auth_token')?.value;
 
   // 1. If trying to access protected path and has no token, redirect to /login
-  if (!isPublicPath && !token) {
-    const loginUrl = new URL('/login', request.url);
-    // Remember redirect parameter
-    loginUrl.searchParams.set('redirect', pathname);
-    return NextResponse.redirect(loginUrl);
-  }
+  // BYPASS: Auth removed for now
+  // if (!isPublicPath && !token) {
+  //   const loginUrl = new URL('/login', request.url);
+  //   loginUrl.searchParams.set('redirect', pathname);
+  //   return NextResponse.redirect(loginUrl);
+  // }
 
   // 2. If trying to access /login or /register and already has token, redirect to dashboard /
-  if (isPublicPath && token) {
-    return NextResponse.redirect(new URL('/', request.url));
-  }
+  // BYPASS: Auth removed for now
+  // if (isPublicPath && token) {
+  //   return NextResponse.redirect(new URL('/', request.url));
+  // }
 
   return NextResponse.next();
 }

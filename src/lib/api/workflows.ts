@@ -293,10 +293,12 @@ const cyberDefinition = {
  * Auto-seeds the default templates if the user has 0 workflows.
  */
 export async function listWorkflows(): Promise<Workflow[]> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    throw new Error('User is not authenticated.');
-  }
+  // BYPASS AUTH
+  // const { data: { user } } = await supabase.auth.getUser();
+  // if (!user) {
+  //   throw new Error('User is not authenticated.');
+  // }
+  const user = { id: 'aa03401c-e1e7-430e-9d3b-f6ce3ea3a6c2' };
 
   const { data, error } = await supabase
     .from('workflows')
@@ -367,10 +369,12 @@ export async function getWorkflow(id: string): Promise<Workflow> {
  * Create a new workflow
  */
 export async function createWorkflow(data: WorkflowCreateData): Promise<Workflow> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    throw new Error('User is not authenticated.');
-  }
+  // BYPASS AUTH
+  // const { data: { user } } = await supabase.auth.getUser();
+  // if (!user) {
+  //   throw new Error('User is not authenticated.');
+  // }
+  const user = { id: 'aa03401c-e1e7-430e-9d3b-f6ce3ea3a6c2' };
 
   const { data: created, error } = await supabase
     .from('workflows')
