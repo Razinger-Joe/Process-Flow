@@ -26,3 +26,27 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     detectSessionInUrl: false
   }
 });
+
+export const isEnvValid = () => {
+  const url = supabaseUrl;
+  const key = supabaseAnonKey;
+  return (
+    url.startsWith('https://') &&
+    (key.startsWith('sb_') || key.startsWith('eyJ'))
+  );
+};
+
+export const getMaskedEnv = () => {
+  const url = supabaseUrl;
+  const key = supabaseAnonKey;
+  
+  const maskString = (str: string, visibleLen = 6) => {
+    if (!str || str.length <= visibleLen * 2) return str;
+    return str.substring(0, visibleLen) + '...' + str.substring(str.length - visibleLen);
+  };
+  
+  return {
+    url: url ? maskString(url, 12) : 'missing/empty',
+    key: key ? maskString(key, 8) : 'missing/empty',
+  };
+};

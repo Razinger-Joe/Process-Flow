@@ -15,6 +15,7 @@ import { Navbar } from '@/components/layout/Navbar';
 import { WorkflowGrid } from '@/components/dashboard/WorkflowGrid';
 import { listWorkflows, createWorkflow } from '@/lib/api/workflows';
 import type { Workflow, NodeStatus } from '@/types/workflow';
+import { isEnvValid, getMaskedEnv } from '@/lib/supabase';
 
 import { useRouter } from 'next/navigation';
 import { toast } from '@/components/ui/toaster';
@@ -49,8 +50,9 @@ export default function DashboardPage() {
     let mounted = true;
     setIsLoading(true);
 
-    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-      toast.error('Supabase environment variables are missing! Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Vercel.', 'Config Error');
+    if (!isEnvValid()) {
+      const masked = getMaskedEnv();
+      toast.error(`Supabase configuration is invalid! URL: "${masked.url}", Key: "${masked.key}". Please configure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Vercel.`, 'Config Error');
       setIsLoading(false);
       return;
     }
