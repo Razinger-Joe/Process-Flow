@@ -13,8 +13,12 @@ import {
 } from '@/components/ui/select';
 import { Navbar } from '@/components/layout/Navbar';
 import { WorkflowGrid } from '@/components/dashboard/WorkflowGrid';
-import { fetchWorkflows } from '@/lib/mockData';
+import { listWorkflows, createWorkflow } from '@/lib/api/workflows';
 import type { Workflow, NodeStatus } from '@/types/workflow';
+
+import { useRouter } from 'next/navigation';
+import { toast } from '@/components/ui/toaster';
+import { Loader2 } from 'lucide-react';
 
 // ============================================================
 // Status filter options
@@ -33,8 +37,10 @@ const filterOptions: { value: FilterStatus; label: string }[] = [
 // Dashboard page
 // ============================================================
 export default function DashboardPage() {
+  const router = useRouter();
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isCreating, setIsCreating] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<FilterStatus>('all');
 
@@ -43,17 +49,54 @@ export default function DashboardPage() {
     let mounted = true;
     setIsLoading(true);
 
-    fetchWorkflows().then((data) => {
-      if (mounted) {
-        setWorkflows(data);
-        setIsLoading(false);
-      }
-    });
+    listWorkflows()
+      .then((data) => {
+        if (mounted) {
+          const mapped = data.map((w: any) => ({
+            id: w.id,
+            name: w.name,
+            description: w.description || '',
+            nodes: w.definition?.nodes || [],
+            edges: w.definition?.edges || [],
+            createdAt: w.created_at,
+            updatedAt: w.updated_at,
+            lastRunAt: w.last_run_at || undefined,
+            lastRunStatus: (w.last_run_status as NodeStatus) || 'idle',
+          }));
+          setWorkflows(mapped);
+          setIsLoading(false);
+        }
+      })
+      .catch((error) => {
+        console.error('Error listing workflows:', error);
+        toast.error('Failed to load workflows. Please check your backend connection.');
+        if (mounted) {
+          setIsLoading(false);
+        }
+      });
 
     return () => {
       mounted = false;
     };
   }, []);
+
+  const handleCreateWorkflow = async () => {
+    setIsCreating(true);
+    try {
+      const newWf = await createWorkflow({
+        name: 'Untitled Workflow',
+        description: 'New workflow automation',
+        definition: { nodes: [], edges: [] },
+      });
+      toast.success('Workflow created successfully!', 'Success');
+      router.push(`/editor/${newWf.id}`);
+    } catch (error) {
+      console.error('Error creating workflow:', error);
+      toast.error('Failed to create new workflow. Please try again.');
+    } finally {
+      setIsCreating(false);
+    }
+  };
 
   // Filtered workflows
   const filteredWorkflows = useMemo(() => {
@@ -72,7 +115,7 @@ export default function DashboardPage() {
     // Status filter
     if (statusFilter !== 'all') {
       result = result.filter(
-        (wf) => (wf.lastRunStatus ?? 'idle') === statusFilter
+        (wf) => (wf as any).lastRunStatus === statusFilter
       );
     }
 
@@ -91,8 +134,16 @@ export default function DashboardPage() {
           <h1 className="text-2xl font-bold tracking-tight text-foreground">
             My Workflows
           </h1>
-          <Button className="bg-violet-600 text-white hover:bg-violet-700 dark:bg-violet-600 dark:hover:bg-violet-500">
-            <Plus className="size-4" />
+          <Button
+            onClick={handleCreateWorkflow}
+            disabled={isCreating}
+            className="bg-violet-600 text-white hover:bg-violet-700 dark:bg-violet-600 dark:hover:bg-violet-500"
+          >
+            {isCreating ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Plus className="size-4" />
+            )}
             New Workflow
           </Button>
         </div>

@@ -24,6 +24,12 @@ interface WorkflowStore {
   runStatus: NodeStatus;
   logs: LogLine[];
 
+  // Save state
+  isSaving: boolean;
+  setIsSaving: (saving: boolean) => void;
+  lastSavedAt: string | null;
+  setLastSavedAt: (date: string | null) => void;
+
   // Actions
   addNode: (node: WorkflowNode) => void;
   updateNode: (id: string, updates: Partial<WorkflowNode>) => void;
@@ -32,6 +38,8 @@ interface WorkflowStore {
   deleteEdge: (id: string) => void;
   startRun: () => void;
   appendLog: (log: LogLine) => void;
+  setRunStatus: (status: NodeStatus) => void;
+  setIsRunning: (running: boolean) => void;
   resetRun: () => void;
 
   // Theme
@@ -56,8 +64,15 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
   runStatus: 'idle' as NodeStatus,
   logs: [],
 
+  // ----- Save state -----
+  isSaving: false,
+  setIsSaving: (saving) => set({ isSaving: saving }),
+  lastSavedAt: null,
+  setLastSavedAt: (date) => set({ lastSavedAt: date }),
+
   // ----- Node CRUD -----
   addNode: (node) =>
+
     set((state) => {
       if (!state.workflow) return state;
       return {
@@ -139,6 +154,11 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
     set((state) => ({
       logs: [...state.logs, log],
     })),
+
+  setRunStatus: (status) => set({ runStatus: status }),
+
+  setIsRunning: (running) => set({ isRunning: running }),
+
 
   resetRun: () =>
     set((state) => {

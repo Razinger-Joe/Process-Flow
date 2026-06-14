@@ -3,9 +3,10 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { fetchRunRecord } from '@/lib/mockData';
-import type { RunRecord, LogLine } from '@/types/workflow';
+import { getRun, RunRecord, LogLine } from '@/lib/api/runs';
+import { getWorkflow, Workflow } from '@/lib/api/workflows';
 import { cn } from '@/lib/utils';
+import { toast } from '@/components/ui/toaster';
 
 import { Navbar } from '@/components/layout/Navbar';
 import { Badge } from '@/components/ui/badge';
@@ -78,7 +79,7 @@ function formatDate(iso: string): string {
   });
 }
 
-function formatDuration(start: string, end?: string): string {
+function formatDuration(start: string, end?: string | null): string {
   if (!end) return 'In progress…';
   const ms = new Date(end).getTime() - new Date(start).getTime();
   if (ms < 1000) return `${ms}ms`;
@@ -89,20 +90,45 @@ export default function RunDetailPage() {
   const params = useParams();
   const runId = params.id as string;
   const [run, setRun] = useState<RunRecord | null>(null);
+  const [workflow, setWorkflow] = useState<Workflow | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let mounted = true;
-    fetchRunRecord(runId).then((r) => {
-      if (mounted) {
-        setRun(r);
-        setLoading(false);
+    setLoading(true);
+
+    const loadData = async () => {
+      try {
+        const runData = await getRun(runId);
+        if (!mounted) return;
+        setRun(runData);
+
+        const wfData = await getWorkflow(runData.workflow_id);
+        if (mounted) {
+          setWorkflow(wfData);
+          setLoading(false);
+        }
+      } catch (err) {
+        console.error('Error loading run detail page data:', err);
+        toast.error('Failed to load workflow run records.');
+        if (mounted) {
+          setLoading(false);
+        }
       }
-    });
+    };
+
+    loadData();
+
     return () => {
       mounted = false;
     };
   }, [runId]);
+
+  const getNodeLabel = (nodeId?: string | null) => {
+    if (!nodeId || nodeId === 'system') return 'System';
+    const node = workflow?.definition?.nodes?.find((n: any) => n.id === nodeId);
+    return node?.label || nodeId;
+  };
 
   if (loading) {
     return (
@@ -151,11 +177,11 @@ export default function RunDetailPage() {
         <div className="mx-auto max-w-4xl p-6 space-y-6">
           {/* Back link */}
           <Link
-            href="/"
+            href={workflow ? `/editor/${workflow.id}` : '/'}
             className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             <ArrowLeft className="h-4 w-4" />
-            Back to workflows
+            Back to editor
           </Link>
 
           {/* Run header */}
@@ -163,7 +189,7 @@ export default function RunDetailPage() {
             <div className="space-y-1">
               <div className="flex items-center gap-3">
                 <h1 className="text-2xl font-bold tracking-tight">
-                  Run {run.id}
+                  Run {run.id.slice(0, 8)}
                 </h1>
                 <Badge
                   variant={status.variant as 'secondary' | 'destructive'}
@@ -180,7 +206,7 @@ export default function RunDetailPage() {
                 </Badge>
               </div>
               <p className="text-sm text-muted-foreground">
-                Workflow: {run.workflowId}
+                Workflow: <span className="font-semibold text-foreground">{workflow?.name || run.workflow_id}</span>
               </p>
             </div>
           </div>
@@ -195,10 +221,10 @@ export default function RunDetailPage() {
                 <div>
                   <p className="text-xs text-muted-foreground">Started</p>
                   <p className="text-sm font-medium">
-                    {formatDate(run.startedAt)}
+                    {formatDate(run.started_at)}
                   </p>
-                  <p className="text-xs text-muted-foreground">
-                    {formatTimestamp(run.startedAt)}
+                  <p className="text-xs text-muted-foreground font-mono">
+                    {formatTimestamp(run.started_at)}
                   </p>
                 </div>
               </CardContent>
@@ -212,7 +238,7 @@ export default function RunDetailPage() {
                 <div>
                   <p className="text-xs text-muted-foreground">Duration</p>
                   <p className="text-sm font-medium">
-                    {formatDuration(run.startedAt, run.completedAt)}
+                    {formatDuration(run.started_at, run.completed_at)}
                   </p>
                 </div>
               </CardContent>
@@ -225,7 +251,7 @@ export default function RunDetailPage() {
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Log entries</p>
-                  <p className="text-sm font-medium">{run.logs.length}</p>
+                  <p className="text-sm font-medium">{run.logs?.length || 0}</p>
                 </div>
               </CardContent>
             </Card>
@@ -243,50 +269,56 @@ export default function RunDetailPage() {
             <CardContent className="p-0">
               <ScrollArea className="max-h-[500px]">
                 <div className="divide-y divide-border/50">
-                  {run.logs.map((log, index) => {
-                    const config = levelConfig[log.level];
-                    const Icon = config.icon;
+                  {run.logs && run.logs.length > 0 ? (
+                    run.logs.map((log, index) => {
+                      const config = levelConfig[log.level] || levelConfig.info;
+                      const Icon = config.icon;
 
-                    return (
-                      <div
-                        key={log.id}
-                        className="flex items-start gap-4 px-6 py-3 hover:bg-muted/30 transition-colors"
-                      >
-                        {/* Timeline indicator */}
-                        <div className="flex flex-col items-center pt-1">
-                          <div
-                            className={cn(
-                              'flex h-7 w-7 items-center justify-center rounded-full',
-                              config.bg
-                            )}
-                          >
-                            <Icon className={cn('h-3.5 w-3.5', config.color)} />
-                          </div>
-                          {index < run.logs.length - 1 && (
-                            <div className="mt-1 h-full w-px bg-border/50" />
-                          )}
-                        </div>
-
-                        {/* Log content */}
-                        <div className="flex-1 min-w-0 space-y-0.5">
-                          <div className="flex items-center gap-2">
-                            <Badge
-                              variant="outline"
-                              className="text-xs font-mono"
+                      return (
+                        <div
+                          key={log.id || index}
+                          className="flex items-start gap-4 px-6 py-3 hover:bg-muted/30 transition-colors"
+                        >
+                          {/* Timeline indicator */}
+                          <div className="flex flex-col items-center pt-1">
+                            <div
+                              className={cn(
+                                'flex h-7 w-7 items-center justify-center rounded-full',
+                                config.bg
+                              )}
                             >
-                              {log.nodeName}
-                            </Badge>
-                            <span className="text-xs text-muted-foreground font-mono">
-                              {formatTimestamp(log.timestamp)}
-                            </span>
+                              <Icon className={cn('h-3.5 w-3.5', config.color)} />
+                            </div>
+                            {index < run.logs.length - 1 && (
+                              <div className="mt-1 h-full w-px bg-border/50" />
+                            )}
                           </div>
-                          <p className={cn('text-sm', config.color)}>
-                            {log.message}
-                          </p>
+
+                          {/* Log content */}
+                          <div className="flex-1 min-w-0 space-y-0.5">
+                            <div className="flex items-center gap-2">
+                              <Badge
+                                variant="outline"
+                                className="text-xs font-mono"
+                              >
+                                {getNodeLabel(log.nodeId)}
+                              </Badge>
+                              <span className="text-xs text-muted-foreground font-mono">
+                                {formatTimestamp(log.timestamp)}
+                              </span>
+                            </div>
+                            <p className={cn('text-sm font-mono whitespace-pre-wrap', config.color)}>
+                              {log.message}
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })
+                  ) : (
+                    <div className="p-6 text-center text-sm text-muted-foreground">
+                      No logs recorded for this run.
+                    </div>
+                  )}
                 </div>
               </ScrollArea>
             </CardContent>

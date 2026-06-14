@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { Zap, Play, Save, Sun, Moon } from 'lucide-react';
+import { Zap, Play, Save, Sun, Moon, Loader2, LogOut } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,6 +10,16 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import { useWorkflowStore } from '@/store/workflowStore';
 import type { NodeStatus } from '@/types/workflow';
+import { logout } from '@/lib/api/auth';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+
 
 // ============================================================
 // Status badge styles
@@ -52,6 +62,9 @@ export function Navbar({ workflowName, isEditor = false, onRun, onSave, onRename
   const theme = useWorkflowStore((s) => s.theme);
   const toggleTheme = useWorkflowStore((s) => s.toggleTheme);
   const runStatus = useWorkflowStore((s) => s.runStatus);
+
+  const isSaving = useWorkflowStore((s) => s.isSaving);
+  const lastSavedAt = useWorkflowStore((s) => s.lastSavedAt);
 
   // Inline‑editable workflow name
   const [isEditing, setIsEditing] = useState(false);
@@ -157,9 +170,25 @@ export function Navbar({ workflowName, isEditor = false, onRun, onSave, onRename
       {/* RIGHT — Actions                                     */}
       {/* -------------------------------------------------- */}
       <div className="ml-auto flex items-center gap-1.5">
+        {/* Saving status (editor only) */}
+        {isEditor && (
+          <div className="hidden text-xs text-muted-foreground mr-2 sm:flex items-center gap-1.5">
+            {isSaving ? (
+              <span className="flex items-center gap-1 text-violet-400">
+                <Loader2 className="size-3 animate-spin" />
+                Saving…
+              </span>
+            ) : lastSavedAt ? (
+              <span>Saved at {new Date(lastSavedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+            ) : (
+              <span>All changes saved</span>
+            )}
+          </div>
+        )}
+
         {/* Save (editor only) */}
         {isEditor && onSave && (
-          <Button variant="outline" size="sm" onClick={onSave}>
+          <Button variant="outline" size="sm" onClick={onSave} disabled={isSaving}>
             <Save className="size-3.5" />
             <span className="hidden sm:inline">Save</span>
           </Button>
@@ -192,12 +221,24 @@ export function Navbar({ workflowName, isEditor = false, onRun, onSave, onRename
           )}
         </Button>
 
-        {/* User avatar */}
-        <Avatar className="ml-1 h-7 w-7">
-          <AvatarFallback className="bg-violet-600/15 text-xs font-semibold text-violet-600 dark:bg-violet-500/20 dark:text-violet-400">
-            PF
-          </AvatarFallback>
-        </Avatar>
+        {/* User avatar dropdown */}
+        <DropdownMenu>
+          <DropdownMenuTrigger className="focus:outline-none cursor-pointer rounded-full ml-1 shrink-0">
+            <Avatar className="h-7 w-7">
+              <AvatarFallback className="bg-violet-600/15 text-xs font-semibold text-violet-600 dark:bg-violet-500/20 dark:text-violet-400">
+                PF
+              </AvatarFallback>
+            </Avatar>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuLabel>My Account</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={logout} className="text-rose-500 focus:text-rose-500 cursor-pointer">
+              <LogOut className="mr-2 size-4" />
+              <span>Log out</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </header>
   );

@@ -151,8 +151,12 @@ class WorkflowEngine:
                 node_type = node.get("type", "")
                 config = node.get("config", {})
 
-                # Find correct runner
-                runner_module = RUNNERS.get(node_label)
+                # Find correct runner by matching prefix
+                runner_module = None
+                for runner_name, module in RUNNERS.items():
+                    if node_label.startswith(runner_name):
+                        runner_module = module
+                        break
                 if not runner_module:
                     context.add_log(f"Warning: No runner found for node '{node_label}' (type: {node_type}). Using stub.", curr_id, "warning")
                     runner_module = run_trigger_node
@@ -178,7 +182,7 @@ class WorkflowEngine:
                 outgoing_edges = adj_list.get(curr_id, [])
                 
                 # Special handling for condition branching
-                if node_label == "Condition":
+                if node_label.startswith("Condition"):
                     result_val = output.get("result", False)
                     target_handle = "true" if result_val else "false"
                     context.add_log(f"Branching: following '{target_handle}' path", curr_id, "info")
