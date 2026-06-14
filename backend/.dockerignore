@@ -1,0 +1,44 @@
+# ── Virtual environments ───────────────────────────────────
+venv/
+.venv/
+env/
+
+# ── Python bytecode / caches ──────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+
+# ── Environment / secrets ─────────────────────────────────
+.env
+.env.*
+
+# ── Version control ───────────────────────────────────────
+.git/
+.gitignore
+
+# ── Tests ─────────────────────────────────────────────────
+tests/
+
+# ── Alembic auto-generated migration scripts ─────────────
+alembic/versions/*.py
+
+# ── IDE / editor ──────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── Docker (avoid recursive context) ─────────────────────
+docker-compose*.yml
+Dockerfile
+
+# ── OS files ──────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Misc ──────────────────────────────────────────────────
+*.log
+*.egg-info/
+dist/
+build/

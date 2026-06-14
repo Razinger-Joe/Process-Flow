@@ -49,8 +49,12 @@ class WorkflowEngine:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def execute(self, run_id: uuid.UUID) -> None:
+    async def execute(self, run_id: uuid.UUID | str) -> None:
         """Loads a run record, executes its workflow graph, and writes progress."""
+        # Normalize run_id to UUID object (API may pass string)
+        if isinstance(run_id, str):
+            run_id = uuid.UUID(run_id)
+
         # 1. Fetch RunRecord and associated Workflow
         result = await self.db.execute(select(RunRecord).where(RunRecord.id == run_id))
         run_record = result.scalar_one_or_none()
