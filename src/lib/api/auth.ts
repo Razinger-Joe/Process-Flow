@@ -1,4 +1,4 @@
-import { apiClient } from './client';
+import { supabase } from '../supabase';
 
 export interface User {
   id: string;
@@ -14,51 +14,76 @@ export interface Token {
 }
 
 /**
- * Register a new user account
+ * Register a new user account using Supabase Auth
  */
 export async function register(email: string, password: string, fullName?: string): Promise<User> {
-  const response = await apiClient.post<User>('/auth/register', {
+  const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    full_name: fullName || null,
-  });
-  return response.data;
-}
-
-/**
- * Login and store JWT token in localStorage and cookies
- */
-export async function login(email: string, password: string): Promise<Token> {
-  // OAuth2PasswordRequestForm requires form-urlencoded format
-  const params = new URLSearchParams();
-  params.append('username', email);
-  params.append('password', password);
-
-  const response = await apiClient.post<Token>('/auth/login', params, {
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
+    options: {
+      data: {
+        full_name: fullName || null,
+      },
     },
   });
 
-  const { access_token } = response.data;
+  if (error) {
+    throw error;
+  }
+
+  if (!data.user) {
+    throw new Error('Registration failed: no user returned.');
+  }
+
+  return {
+    id: data.user.id,
+    email: data.user.email || '',
+    full_name: data.user.user_metadata?.full_name || null,
+    created_at: data.user.created_at,
+    is_active: true,
+  };
+}
+
+/**
+ * Login using Supabase Auth and write the session token to the auth_token cookie
+ */
+export async function login(email: string, password: string): Promise<Token> {
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  const session = data.session;
+  if (!session) {
+    throw new Error('Login failed: no session returned.');
+  }
+
+  const access_token = session.access_token;
 
   if (typeof window !== 'undefined') {
-    // Save to localStorage for client headers
+    // Save to localStorage for client headers (fallback)
     localStorage.setItem('auth_token', access_token);
 
     // Save to cookies for middleware route protection
-    // Sets secure flag if running under HTTPS (or simply standard cookie for local/prod)
     const secure = window.location.protocol === 'https:' ? '; Secure' : '';
-    document.cookie = `auth_token=${access_token}; path=/; max-age=604800${secure}`; // 7 days
+    document.cookie = `auth_token=${access_token}; path=/; max-age=604800; SameSite=Lax${secure}`; // 7 days
   }
 
-  return response.data;
+  return {
+    access_token,
+    token_type: 'bearer',
+  };
 }
 
 /**
  * Log out and clear all credentials
  */
-export function logout(): void {
+export async function logout(): Promise<void> {
+  await supabase.auth.signOut();
   if (typeof window !== 'undefined') {
     localStorage.removeItem('auth_token');
     document.cookie = 'auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
@@ -67,9 +92,20 @@ export function logout(): void {
 }
 
 /**
- * Fetch the current logged-in user profile
+ * Fetch the current logged-in user profile from Supabase session
  */
 export async function getMe(): Promise<User> {
-  const response = await apiClient.get<User>('/auth/me');
-  return response.data;
+  const { data: { user }, error } = await supabase.auth.getUser();
+
+  if (error || !user) {
+    throw error || new Error('Not authenticated');
+  }
+
+  return {
+    id: user.id,
+    email: user.email || '',
+    full_name: user.user_metadata?.full_name || null,
+    created_at: user.created_at,
+    is_active: true,
+  };
 }

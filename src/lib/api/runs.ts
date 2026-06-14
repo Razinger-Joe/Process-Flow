@@ -1,4 +1,4 @@
-import { apiClient } from './client';
+import { supabase } from '../supabase';
 
 export interface LogLine {
   id: string;
@@ -12,7 +12,7 @@ export interface RunRecord {
   id: string;
   workflow_id: string;
   user_id: string;
-  status: 'idle' | 'running' | 'success' | 'error';
+  status: 'idle' | 'running' | 'success' | 'error' | 'cancelled';
   started_at: string;
   completed_at: string | null;
   logs: LogLine[];
@@ -23,28 +23,70 @@ export interface RunRecord {
  * Trigger execution run of a workflow
  */
 export async function triggerRun(workflowId: string): Promise<RunRecord> {
-  const response = await apiClient.post<RunRecord>(`/runs/${workflowId}/trigger`);
-  return response.data;
+  const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+  
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch('/api/runs/trigger', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ workflowId }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || `Failed to trigger execution run: ${response.statusText}`);
+  }
+
+  return response.json();
 }
 
 /**
  * Get run execution history for a workflow
  */
 export async function listRuns(workflowId: string): Promise<RunRecord[]> {
-  const response = await apiClient.get<RunRecord[]>(`/runs/workflow/${workflowId}`);
-  return response.data;
+  const { data, error } = await supabase
+    .from('run_records')
+    .select('*')
+    .eq('workflow_id', workflowId)
+    .order('started_at', { ascending: false });
+
+  if (error) {
+    throw error;
+  }
+
+  return (data || []) as RunRecord[];
 }
 
 /**
  * Get execution details and logs of a single run
  */
 export async function getRun(runId: string): Promise<RunRecord> {
-  const response = await apiClient.get<RunRecord>(`/runs/detail/${runId}`);
-  return response.data;
+  const { data, error } = await supabase
+    .from('run_records')
+    .select('*')
+    .eq('id', runId)
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    throw new Error('Run record not found');
+  }
+
+  return data as RunRecord;
 }
 
 /**
- * Establishes a Server-Sent Events (SSE) connection to stream logs in real-time
+ * Establishes a database polling connection to stream logs in real-time
  */
 export function streamRunLogs(
   runId: string,
@@ -52,44 +94,55 @@ export function streamRunLogs(
   onComplete?: (status: string) => void,
   onError?: (error: any) => void
 ): () => void {
-  const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
-  const url = `${baseURL}/runs/detail/${runId}/stream`;
+  let active = true;
+  const seenLogIds = new Set<string>();
 
-  const eventSource = new EventSource(url);
-
-  eventSource.addEventListener('log', (event: MessageEvent) => {
+  const poll = async () => {
+    if (!active) return;
     try {
-      const logData = JSON.parse(event.data) as LogLine;
-      onLogLine(logData);
-    } catch (err) {
-      console.error('Error parsing SSE log data:', err);
-    }
-  });
+      const { data, error } = await supabase
+        .from('run_records')
+        .select('status, logs')
+        .eq('id', runId)
+        .single();
 
-  eventSource.addEventListener('complete', (event: MessageEvent) => {
-    try {
-      const data = JSON.parse(event.data);
-      if (onComplete) {
-        onComplete(data.status);
+      if (error) {
+        throw error;
       }
-      eventSource.close();
-    } catch (err) {
-      console.error('Error parsing SSE complete data:', err);
-      eventSource.close();
-    }
-  });
 
-  eventSource.addEventListener('error', (event) => {
-    if (onError) {
-      onError(event);
+      if (!active) return;
+
+      const logs = (data?.logs || []) as LogLine[];
+      for (const log of logs) {
+        if (!seenLogIds.has(log.id)) {
+          seenLogIds.add(log.id);
+          onLogLine(log);
+        }
+      }
+
+      if (data?.status === 'success' || data?.status === 'error' || data?.status === 'cancelled') {
+        active = false;
+        if (onComplete) {
+          onComplete(data.status);
+        }
+      }
+    } catch (err) {
+      console.error('Error polling run logs:', err);
+      if (onError) {
+        onError(err);
+      }
     }
-    eventSource.close();
-  });
+  };
+
+  // Perform initial poll immediately
+  poll();
+
+  const intervalId = setInterval(poll, 1500);
 
   // Return a cleanup/disconnect function
   return () => {
-    if (eventSource.readyState !== eventSource.CLOSED) {
-      eventSource.close();
-    }
+    active = false;
+    clearInterval(intervalId);
   };
 }
+
