@@ -1,0 +1,45 @@
+# =============================================================
+# ProcessFlow Studio — Backend Dependencies
+# =============================================================
+
+# Framework
+fastapi==0.115.12
+uvicorn[standard]==0.34.3
+python-multipart==0.0.20
+
+# Database
+sqlalchemy[asyncio]==2.0.41
+asyncpg==0.30.0
+alembic==1.16.1
+
+# Task queue
+celery==5.5.2
+redis==5.3.0
+
+# Auth
+python-jose[cryptography]==3.4.0
+passlib[bcrypt]==1.7.4
+
+# Validation & settings
+pydantic==2.11.4
+pydantic-settings==2.9.1
+
+# HTTP client (for node runners)
+httpx==0.28.1
+
+# Email
+aiosmtplib==3.0.2
+
+# Environment
+python-dotenv==1.1.0
+
+# SSE streaming
+sse-starlette==2.3.5
+
+# Testing
+pytest==8.4.0
+pytest-asyncio==1.0.0
+httpx==0.28.1
+
+# Utilities
+uuid7==0.1.0
